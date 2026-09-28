@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Almoxarifado 2.0</title>
+  
+  <!-- Tailwind CSS para Design Moderno e Responsivo -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Ícones Phosphor/FontAwesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Chart.js para Gráficos Mensais -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- html2pdf para Exportação de Relatórios -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    /* Estilização da barra de rolagem para dar o indicador visual que você pediu */
+    ::-webkit-scrollbar {
+      width: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #94a3b8;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 flex flex-col min-h-screen antialiased">
+
+  <!-- ================= CABEÇALHO & NAVEGAÇÃO ================= -->
+  <header class="bg-slate-900 text-white shadow-md sticky top-0 z-30">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+      <div class="flex items-center gap-2">
+        <i class="fa-solid fa-boxes-stacked text-blue-400 text-xl"></i>
+        <h1 class="text-lg font-bold tracking-wide">Almoxarifado <span class="text-blue-400">2.0</span></h1>
+      </div>
+      <div class="text-xs text-slate-400 font-mono bg-slate-800 px-2.5 py-1 rounded-full border border-slate-700">
+        <i class="fa-solid fa-circle text-emerald-400 text-[8px] animate-pulse mr-1"></i> Offline Ready
+      </div>
+    </div>
+
+    <!-- 3 Abas Principais -->
+    <nav class="max-w-4xl mx-auto px-4 flex border-t border-slate-800">
+      <button onclick="trocarAba('itens')" id="tab-itens" class="flex-1 py-3 text-center font-semibold text-sm border-b-2 border-blue-500 text-blue-400 flex items-center justify-center gap-2">
+        <i class="fa-solid fa-box"></i> Itens
+      </button>
+      <button onclick="trocarAba('historico')" id="tab-historico" class="flex-1 py-3 text-center font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2">
+        <i class="fa-solid fa-clock-rotate-left"></i> Histórico
+      </button>
+      <button onclick="trocarAba('dados')" id="tab-dados" class="flex-1 py-3 text-center font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center justify-center gap-2">
+        <i class="fa-solid fa-chart-line"></i> Dados
+      </button>
+    </nav>
+  </header>
+
+  <!-- ================= CONTEÚDO PRINCIPAL ================= -->
+  <main class="max-w-4xl mx-auto w-full flex-1 p-4 pb-24">
+
+    <!-- ================= ABA 1: ITENS ================= -->
+    <section id="view-itens" class="space-y-4">
+      <!-- Barra de Busca & Botão Novo Item -->
+      <div class="flex gap-2">
+        <div class="relative flex-1">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-slate-400 text-sm"></i>
+          <input type="text" id="search-input" oninput="renderizarItens()" placeholder="Buscar item no almoxarifado..." 
+                 class="w-full pl-9 pr-3 py-2.5 bg-white rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm shadow-sm">
+        </div>
+        <button onclick="abrirModalCadastro()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium text-sm flex items-center gap-2 shadow-sm transition">
+          <i class="fa-solid fa-plus"></i> <span class="hidden sm:inline">Cadastrar</span>
+        </button>
+      </div>
+
+      <!-- Lista de Itens com Rolagem -->
+      <div id="lista-itens" class="space-y-2.5 max-h-[72vh] overflow-y-auto pr-1">
+        <!-- Inserido dinamicamente via JS -->
+      </div>
+    </section>
+
+    <!-- ================= ABA 2: HISTÓRICO ================= -->
+    <section id="view-historico" class="space-y-4 hidden">
+      <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+        <h2 class="font-bold text-slate-700 text-sm flex items-center gap-2">
+          <i class="fa-solid fa-receipt text-blue-500"></i> Extrato de Movimentações
+        </h2>
+        <span id="badge-total-hist" class="text-xs bg-slate-100 text-slate-600 font-semibold px-2 py-1 rounded-md">0 registros</span>
+      </div>
+
+      <div id="lista-historico" class="space-y-2 max-h-[72vh] overflow-y-auto pr-1">
+        <!-- Inserido dinamicamente via JS -->
+      </div>
+    </section>
+
+    <!-- ================= ABA 3: DADOS ================= -->
+    <section id="view-dados" class="space-y-4 hidden">
+      <div class="flex justify-between items-center bg-white p-3 rounded-xl border border-slate-200 shadow-sm">
+        <div>
+          <h2 class="font-bold text-slate-800 text-sm">Relatório Gerencial</h2>
+          <p class="text-xs text-slate-500">Resumo consolidado do mês</p>
+        </div>
+        <button onclick="exportarPDF()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-sm transition">
+          <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+        </button>
+      </div>
+
+      <div id="relatorio-exportavel" class="space-y-4 bg-white p-4 rounded-xl border border-slate-200">
+        <!-- Cards de Resumo / KPIs -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="bg-rose-50 border border-rose-100 p-3.5 rounded-xl">
+            <span class="text-xs text-rose-600 font-bold uppercase tracking-wider block mb-1">Mais Retirado</span>
+            <div id="kpi-mais-retirado" class="text-sm font-extrabold text-slate-800 truncate">Nenhum</div>
+            <span id="kpi-mais-retirado-qtd" class="text-xs text-rose-500 font-medium">0 retiradas</span>
+          </div>
+          
+          <div class="bg-emerald-50 border border-emerald-100 p-3.5 rounded-xl">
+            <span class="text-xs text-emerald-600 font-bold uppercase tracking-wider block mb-1">Mais Adicionado</span>
+            <div id="kpi-mais-adicionado" class="text-sm font-extrabold text-slate-800 truncate">Nenhum</div>
+            <span id="kpi-mais-adicionado-qtd" class="text-xs text-emerald-500 font-medium">0 entradas</span>
+          </div>
+
+          <div class="bg-blue-50 border border-blue-100 p-3.5 rounded-xl">
+            <span class="text-xs text-blue-600 font-bold uppercase tracking-wider block mb-1">Dia Mais Movimentado</span>
+            <div id="kpi-dia-movimentado" class="text-sm font-extrabold text-slate-800">Nenhum</div>
+            <span id="kpi-dia-movimentado-qtd" class="text-xs text-blue-500 font-medium">0 ações</span>
+          </div>
+        </div>
+
+        <!-- Gráfico Mensal -->
+        <div class="pt-2">
+          <h3 class="text-xs font-bold text-slate-600 uppercase mb-2">Movimentações por Dia do Mês</h3>
+          <div class="w-full h-64">
+            <canvas id="graficoMensal"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ================= MODAL 1: CADASTRAR / EDITAR ITEM ================= -->
+  <div id="modal-cadastro" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b pb-3">
+        <h3 class="font-bold text-slate-800 text-base" id="modal-cadastro-titulo">Novo Item no Almoxarifado</h3>
+        <button onclick="fecharModalCadastro()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <input type="hidden" id="cadastro-id">
+
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">Nome Completo do Item *</label>
+        <textarea id="cadastro-nome" rows="2" placeholder="Ex: Chave Phillips 1/4 ou Parafuso M8x40..." 
+                  class="w-full p-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+        <p id="err-cadastro-nome" class="text-rose-500 text-xs mt-1 hidden font-semibold">Informe o nome do item.</p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">Quantidade Inicial</label>
+        <input type="number" id="cadastro-qtd" value="0" min="0" 
+               class="w-full p-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div class="flex justify-between items-center pt-3 border-t">
+        <button type="button" id="btn-excluir-item" onclick="excluirItemAtual()" class="text-rose-500 hover:text-rose-700 text-xs font-bold flex items-center gap-1 hidden">
+          <i class="fa-solid fa-trash"></i> Excluir Item
+        </button>
+        <div class="flex gap-2 ml-auto">
+          <button type="button" onclick="fecharModalCadastro()" class="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Cancelar</button>
+          <button type="button" onclick="salvarItem()" class="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= MODAL 2: MOVIMENTAÇÃO (RETIRAR / ADICIONAR) ================= -->
+  <div id="modal-movimento" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white rounded-2xl w-full max-w-md p-5 shadow-2xl space-y-4">
+      <div class="flex justify-between items-start border-b pb-3">
+        <div>
+          <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Movimentação de Estoque</span>
+          <h3 id="mov-item-nome" class="font-bold text-slate-800 text-base leading-snug break-words">Nome do Item</h3>
+        </div>
+        <button onclick="fecharModalMovimento()" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+
+      <div class="bg-slate-50 border border-slate-200 p-3 rounded-xl flex justify-between items-center">
+        <span class="text-xs text-slate-600 font-medium">Estoque Disponível Atual:</span>
+        <span id="mov-item-estoque-atual" class="font-extrabold text-slate-900 text-base">0</span>
+      </div>
+
+      <!-- Tipo de Ação: Retirar ou Adicionar -->
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1.5">Selecione a Ação *</label>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" onclick="setTipoMovimento('OUT')" id="btn-tipo-out" 
+                  class="py-2.5 px-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition border-rose-500 bg-rose-50 text-rose-700">
+            <i class="fa-solid fa-minus"></i> Retirar
+          </button>
+          <button type="button" onclick="setTipoMovimento('IN')" id="btn-tipo-in" 
+                  class="py-2.5 px-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition border-slate-200 text-slate-600 hover:bg-slate-50">
+            <i class="fa-solid fa-plus"></i> Adicionar
+          </button>
+        </div>
+      </div>
+
+      <!-- Quantidade a movimentar -->
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">Quantidade a Movimentar *</label>
+        <input type="number" id="mov-qtd" min="1" value="1" 
+               class="w-full p-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <p id="err-mov-qtd" class="text-rose-500 text-xs mt-1 hidden font-semibold">Quantidade inválida.</p>
+      </div>
+
+      <!-- Nome do Trabalhador -->
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">Nome do Trabalhador / Responsável *</label>
+        <input type="text" id="mov-trabalhador" placeholder="Quem está retirando ou entregando?" 
+               class="w-full p-2.5 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+        <p id="err-mov-trabalhador" class="text-rose-500 text-xs mt-1 hidden font-semibold">Preencha o nome do trabalhador.</p>
+      </div>
+
+      <div class="flex justify-between items-center pt-3 border-t">
+        <button type="button" onclick="fecharModalMovimento()" class="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl">Cancelar</button>
+        <button type="button" onclick="confirmarMovimentacao()" class="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= JAVASCRIPT & LÓGICA DO APP ================= -->
+  <script>
+    // ESTADO DA APLICAÇÃO (Persistência Offline no LocalStorage)
+    let state = {
+      itens: JSON.parse(localStorage.getItem('almox_itens')) || [],
+      historico: JSON.parse(localStorage.getItem('almox_historico')) || []
+    };
+
+    let itemSelecionadoId = null;
+    let tipoMovimentoAtual = 'OUT'; // 'OUT' = Retirar | 'IN' = Adicionar
+    let chartInstance = null;
+
+    function salvarDadosLocal() {
+      localStorage.setItem('almox_itens', JSON.stringify(state.itens));
+      localStorage.setItem('almox_historico', JSON.stringify(state.historico));
+    }
+
+    // NAVEGAÇÃO DE ABAS
+    function trocarAba(aba) {
+      document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+      document.querySelectorAll('header nav button').forEach(b => {
+        b.classList.remove('border-blue-500', 'text-blue-400');
+        b.classList.add('border-transparent', 'text-slate-400');
+      });
+
+      document.getElementById(`view-${aba}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`tab-${aba}`);
+      activeBtn.classList.add('border-blue-500', 'text-blue-400');
+      activeBtn.classList.remove('border-transparent', 'text-slate-400');
+
+      if (aba === 'itens') renderizarItens();
+      if (aba === 'historico') renderizarHistorico();
+      if (aba === 'dados') carregarDashboard();
+    }
+
+    // ================= CRUD ITENS =================
+    function renderizarItens() {
+      const container = document.getElementById('lista-itens');
+      const termo = document.getElementById('search-input').value.toLowerCase();
+      container.innerHTML = '';
+
+      const filtrados = state.itens.filter(i => i.nome.toLowerCase().includes(termo));
+
+      if (filtrados.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 bg-white rounded-2xl border border-slate-200 p-6">
+            <i class="fa-solid fa-box-open text-4xl text-slate-300 mb-3"></i>
+            <p class="text-sm font-semibold text-slate-500">Nenhum item encontrado.</p>
+            <p class="text-xs text-slate-400 mt-1">Clique em "Cadastrar" para adicionar novos produtos.</p>
+          </div>`;
+        return;
+      }
+
+      filtrados.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'bg-white p-3.5 rounded-xl border border-slate-200 hover:border-blue-400 flex items-center justify-between gap-3 shadow-sm cursor-pointer transition';
+        div.onclick = () => abrirModalMovimento(item.id);
+
+        const statusEstoque = item.quantidade > 0 
+          ? `<span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-1 rounded-lg">${item.quantidade} em estoque</span>`
+          : `<span class="text-xs bg-rose-100 text-rose-800 font-bold px-2.5 py-1 rounded-lg">Zerado</span>`;
+
+        div.innerHTML = `
+          <div class="flex-1 min-w-0">
+            <h4 class="text-sm font-bold text-slate-800 truncate">${item.nome}</h4>
+            <span class="text-[11px] text-slate-400">Toque para retirar ou devolver</span>
+          </div>
+          <div class="flex items-center gap-2">
+            ${statusEstoque}
+            <button onclick="event.stopPropagation(); abrirModalEdicao('${item.id}')" class="text-slate-300 hover:text-slate-600 p-1">
+              <i class="fa-solid fa-pen-to-square text-sm"></i>
+            </button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function abrirModalCadastro() {
+      document.getElementById('cadastro-id').value = '';
+      document.getElementById('cadastro-nome').value = '';
+      document.getElementById('cadastro-qtd').value = '0';
+      document.getElementById('modal-cadastro-titulo').innerText = 'Novo Item no Almoxarifado';
+      document.getElementById('btn-excluir-item').classList.add('hidden');
+      resetErrosCadastro();
+      document.getElementById('modal-cadastro').classList.remove('hidden');
+    }
+
+    function abrirModalEdicao(id) {
+      const item = state.itens.find(i => i.id === id);
+      if (!item) return;
+      document.getElementById('cadastro-id').value = item.id;
+      document.getElementById('cadastro-nome').value = item.nome;
+      document.getElementById('cadastro-qtd').value = item.quantidade;
+      document.getElementById('modal-cadastro-titulo').innerText = 'Editar Item';
+      document.getElementById('btn-excluir-item').classList.remove('hidden');
+      resetErrosCadastro();
+      document.getElementById('modal-cadastro').classList.remove('hidden');
+    }
+
+    function fecharModalCadastro() {
+      document.getElementById('modal-cadastro').classList.add('hidden');
+    }
+
+    function resetErrosCadastro() {
+      document.getElementById('cadastro-nome').classList.remove('border-rose-500', 'bg-rose-50');
+      document.getElementById('err-cadastro-nome').classList.add('hidden');
+    }
+
+    function salvarItem() {
+      const id = document.getElementById('cadastro-id').value;
+      const nome = document.getElementById('cadastro-nome').value.trim();
+      const qtd = parseInt(document.getElementById('cadastro-qtd').value) || 0;
+
+      if (!nome) {
+        document.getElementById('cadastro-nome').classList.add('border-rose-500', 'bg-rose-50');
+        document.getElementById('err-cadastro-nome').classList.remove('hidden');
+        return;
+      }
+
+      if (id) {
+        const item = state.itens.find(i => i.id === id);
+        if (item) {
+          item.nome = nome;
+          item.quantidade = qtd;
+        }
+      } else {
+        state.itens.push({
+          id: Date.now().toString(),
+          nome: nome,
+          quantidade: qtd
+        });
+      }
+
+      salvarDadosLocal();
+      fecharModalCadastro();
+      renderizarItens();
+    }
+
+    function excluirItemAtual() {
+      const id = document.getElementById('cadastro-id').value;
+      if (confirm('Tem certeza que deseja remover este item?')) {
+        state.itens = state.itens.filter(i => i.id !== id);
+        salvarDadosLocal();
+        fecharModalCadastro();
+        renderizarItens();
+      }
+    }
+
+    // ================= MOVIMENTAÇÃO =================
+    function abrirModalMovimento(id) {
+      const item = state.itens.find(i => i.id === id);
+      if (!item) return;
+
+      itemSelecionadoId = id;
+      document.getElementById('mov-item-nome').innerText = item.nome;
+      document.getElementById('mov-item-estoque-atual').innerText = item.quantidade;
+      document.getElementById('mov-qtd').value = '1';
+      document.getElementById('mov-trabalhador').value = '';
+      setTipoMovimento('OUT');
+      resetErrosMovimento();
+
+      document.getElementById('modal-movimento').classList.remove('hidden');
+    }
+
+    function fecharModalMovimento() {
+      document.getElementById('modal-movimento').classList.add('hidden');
+      itemSelecionadoId = null;
+    }
+
+    function setTipoMovimento(tipo) {
+      tipoMovimentoAtual = tipo;
+      const btnOut = document.getElementById('btn-tipo-out');
+      const btnIn = document.getElementById('btn-tipo-in');
+
+      if (tipo === 'OUT') {
+        btnOut.className = 'py-2.5 px-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition border-rose-500 bg-rose-50 text-rose-700';
+        btnIn.className = 'py-2.5 px-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition border-slate-200 text-slate-600 hover:bg-slate-50';
+      } else {
+        btnIn.className = 'py-2.5 px-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition border-emerald-500 bg-emerald-50 text-emerald-700';
+        btnOut.className = 'py-2.5 px-3 rounded-xl border-2 font-bold text-xs flex items-center justify-center gap-2 transition border-slate-200 text-slate-600 hover:bg-slate-50';
+      }
+    }
+
+    function resetErrosMovimento() {
+      document.getElementById('mov-qtd').classList.remove('border-rose-500', 'bg-rose-50');
+      document.getElementById('err-mov-qtd').classList.add('hidden');
+      document.getElementById('mov-trabalhador').classList.remove('border-rose-500', 'bg-rose-50');
+      document.getElementById('err-mov-trabalhador').classList.add('hidden');
+    }
+
+    function confirmarMovimentacao() {
+      resetErrosMovimento();
+      const item = state.itens.find(i => i.id === itemSelecionadoId);
+      const qtd = parseInt(document.getElementById('mov-qtd').value);
+      const trabalhador = document.getElementById('mov-trabalhador').value.trim();
+
+      let valido = true;
+
+      if (isNaN(qtd) || qtd <= 0) {
+        document.getElementById('mov-qtd').classList.add('border-rose-500', 'bg-rose-50');
+        document.getElementById('err-mov-qtd').innerText = "Informe uma quantidade válida.";
+        document.getElementById('err-mov-qtd').classList.remove('hidden');
+        valido = false;
+      } else if (tipoMovimentoAtual === 'OUT' && qtd > item.quantidade) {
+        document.getElementById('mov-qtd').classList.add('border-rose-500', 'bg-rose-50');
+        document.getElementById('err-mov-qtd').innerText = `Estoque insuficiente (Saldo: ${item.quantidade}).`;
+        document.getElementById('err-mov-qtd').classList.remove('hidden');
+        valido = false;
+      }
+
+      if (!trabalhador) {
+        document.getElementById('mov-trabalhador').classList.add('border-rose-500', 'bg-rose-50');
+        document.getElementById('err-mov-trabalhador').classList.remove('hidden');
+        valido = false;
+      }
+
+      if (!valido) return;
+
+      // Atualiza estoque
+      if (tipoMovimentoAtual === 'OUT') {
+        item.quantidade -= qtd;
+      } else {
+        item.quantidade += qtd;
+      }
+
+      // Registra Histórico
+      const agora = new Date();
+      state.historico.unshift({
+        id: Date.now().toString(),
+        itemId: item.id,
+        itemNome: item.nome,
+        tipo: tipoMovimentoAtual,
+        quantidade: qtd,
+        trabalhador: trabalhador,
+        dataHora: agora.toISOString()
+      });
+
+      salvarDadosLocal();
+      fecharModalMovimento();
+      renderizarItens();
+    }
+
+    // ================= HISTÓRICO =================
+    function renderizarHistorico() {
+      const container = document.getElementById('lista-historico');
+      const badge = document.getElementById('badge-total-hist');
+      container.innerHTML = '';
+      badge.innerText = `${state.historico.length} registros`;
+
+      if (state.historico.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-12 bg-white rounded-2xl border border-slate-200 p-6">
+            <i class="fa-solid fa-clipboard-list text-4xl text-slate-300 mb-3"></i>
+            <p class="text-sm font-semibold text-slate-500">Histórico vazio.</p>
+            <p class="text-xs text-slate-400 mt-1">Nenhuma movimentação realizada ainda.</p>
+          </div>`;
+        return;
+      }
+
+      state.historico.forEach(log => {
+        const d = new Date(log.dataHora);
+        const dataFormatada = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+        const horaFormatada = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+        const isOut = log.tipo === 'OUT';
+        const icone = isOut ? 'fa-arrow-down text-rose-500 bg-rose-50' : 'fa-arrow-up text-emerald-500 bg-emerald-50';
+        const sinal = isOut ? '-' : '+';
+        const corQtd = isOut ? 'text-rose-600' : 'text-emerald-600';
+
+        const div = document.createElement('div');
+        div.className = 'bg-white p-3.5 rounded-xl border border-slate-200 flex items-center justify-between gap-3 shadow-sm';
+        div.innerHTML = `
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm ${icone}">
+              <i class="fa-solid ${isOut ? 'fa-arrow-down' : 'fa-arrow-up'}"></i>
+            </div>
+            <div class="min-w-0">
+              <h4 class="text-sm font-bold text-slate-800 truncate">${log.itemNome}</h4>
+              <p class="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
+                <span><i class="fa-solid fa-user text-[10px]"></i> ${log.trabalhador}</span>
+                <span>•</span>
+                <span>${dataFormatada} às ${horaFormatada}</span>
+              </p>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-sm font-extrabold ${corQtd}">${sinal}${log.quantidade}</span>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    // ================= DADOS & DASHBOARD =================
+    function carregarDashboard() {
+      const agora = new Date();
+      const mesAtual = agora.getMonth();
+      const anoAtual = agora.getFullYear();
+
+      // Filtra movimentações do mês atual
+      const logsDoMes = state.historico.filter(h => {
+        const d = new Date(h.dataHora);
+        return d.getMonth() === mesAtual && d.getFullYear() === anoAtual;
+      });
+
+      // Cálculos de KPIs
+      const retiradasPorItem = {};
+      const entradasPorItem = {};
+      const acoesPorDia = {};
+
+      // Inicializa dias do mês para o gráfico
+      const diasNoMes = new Date(anoAtual, mesAtual + 1, 0).getDate();
+      const dadosGraficoSaidas = new Array(diasNoMes).fill(0);
+      const dadosGraficoEntradas = new Array(diasNoMes).fill(0);
+
+      logsDoMes.forEach(log => {
+        const dia = new Date(log.dataHora).getDate();
+        acoesPorDia[dia] = (acoesPorDia[dia] || 0) + 1;
+
+        if (log.tipo === 'OUT') {
+          retiradasPorItem[log.itemNome] = (retiradasPorItem[log.itemNome] || 0) + log.quantidade;
+          dadosGraficoSaidas[dia - 1] += log.quantidade;
+        } else {
+          entradasPorItem[log.itemNome] = (entradasPorItem[log.itemNome] || 0) + log.quantidade;
+          dadosGraficoEntradas[dia - 1] += log.quantidade;
+        }
+      });
+
+      // 1. Mais Retirado
+      let maisRetirado = 'Nenhum', maxRetiradoQtd = 0;
+      for (const [item, qtd] of Object.entries(retiradasPorItem)) {
+        if (qtd > maxRetiradoQtd) { maxRetiradoQtd = qtd; maisRetirado = item; }
+      }
+      document.getElementById('kpi-mais-retirado').innerText = maisRetirado;
+      document.getElementById('kpi-mais-retirado-qtd').innerText = `${maxRetiradoQtd} retirados`;
+
+      // 2. Mais Adicionado
+      let maisAdicionado = 'Nenhum', maxAdicionadoQtd = 0;
+      for (const [item, qtd] of Object.entries(entradasPorItem)) {
+        if (qtd > maxAdicionadoQtd) { maxAdicionadoQtd = qtd; maisAdicionado = item; }
+      }
+      document.getElementById('kpi-mais-adicionado').innerText = maisAdicionado;
+      document.getElementById('kpi-mais-adicionado-qtd').innerText = `${maxAdicionadoQtd} adicionados`;
+
+      // 3. Dia mais movimentado
+      let diaMais = 'Nenhum', maxAcoes = 0;
+      for (const [dia, acoes] of Object.entries(acoesPorDia)) {
+        if (acoes > maxAcoes) { maxAcoes = acoes; diaMais = `Dia ${dia}`; }
+      }
+      document.getElementById('kpi-dia-movimentado').innerText = diaMais;
+      document.getElementById('kpi-dia-movimentado-qtd').innerText = `${maxAcoes} movimentações`;
+
+      // Renderiza Gráfico
+      renderizarGrafico(diasNoMes, dadosGraficoSaidas, dadosGraficoEntradas);
+    }
+
+    function renderizarGrafico(totalDias, saidas, entradas) {
+      const ctx = document.getElementById('graficoMensal').getContext('2d');
+      const labels = Array.from({ length: totalDias }, (_, i) => `${i + 1}`);
+
+      if (chartInstance) chartInstance.destroy();
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Retiradas (Saídas)',
+              data: saidas,
+              borderColor: '#f43f5e',
+              backgroundColor: 'rgba(244, 63, 94, 0.1)',
+              tension: 0.3,
+              fill: true
+            },
+            {
+              label: 'Entradas',
+              data: entradas,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              tension: 0.3,
+              fill: true
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10 } } }
+          },
+          scales: {
+            y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+            x: { grid: { display: false } }
+          }
+        }
+      });
+    }
+
+    // EXPORTAÇÃO EM PDF
+    function exportarPDF() {
+      const elemento = document.getElementById('relatorio-exportavel');
+      const opt = {
+        margin: 10,
+        filename: `Relatorio_Almoxarifado_${new Date().toISOString().slice(0,10)}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      html2pdf().set(opt).from(elemento).save();
+    }
+
+    // Inicialização
+    renderizarItens();
+  </script>
+</body>
+</html>
